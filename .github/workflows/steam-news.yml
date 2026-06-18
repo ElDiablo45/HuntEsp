@@ -27,7 +27,7 @@ jobs:
           STEAM_NEWS_APP_ID: ${{ secrets.STEAM_NEWS_APP_ID }}
           STEAM_NEWS_LANGUAGE: ${{ secrets.STEAM_NEWS_LANGUAGE }}
           STEAM_NEWS_FETCH_COUNT: ${{ secrets.STEAM_NEWS_FETCH_COUNT }}
-          # Add any other secrets your app needs, for example Supabase credentials:
-          # SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          # SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node steamNewsAction.js
