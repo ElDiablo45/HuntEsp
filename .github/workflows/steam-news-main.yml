@@ -2,7 +2,7 @@ name: Steam News Watcher (main)
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '0 */6 * * *'
 
 permissions:
   contents: write
