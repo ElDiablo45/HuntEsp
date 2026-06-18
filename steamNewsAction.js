@@ -20,6 +20,7 @@ async function runSteamNewsAction() {
     console.log(`[Steam News Action] Logged in as ${client.user.tag}`);
 
     await checkSteamNews(client);
+    console.log('[Steam News Action] Check completed successfully.');
 
     await client.destroy();
     console.log('[Steam News Action] Finished and disconnected.');
