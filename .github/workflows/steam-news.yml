@@ -1,12 +1,18 @@
-name: Steam News Watcher
+name: Steam News Watcher Main
 
 on:
   schedule:
-    - cron: '0 */6 * * *'
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
   run-script:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,7 +35,7 @@ jobs:
           node-version: '24'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run Steam News Action
         env:
@@ -38,7 +44,6 @@ jobs:
           STEAM_NEWS_APP_ID: ${{ secrets.STEAM_NEWS_APP_ID }}
           STEAM_NEWS_LANGUAGE: ${{ secrets.STEAM_NEWS_LANGUAGE }}
           STEAM_NEWS_FETCH_COUNT: ${{ secrets.STEAM_NEWS_FETCH_COUNT }}
-          
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node steamNewsAction.js
