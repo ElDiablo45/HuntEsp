@@ -1,0 +1,33 @@
+name: Steam News Watcher
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run Steam News Action
+        env:
+          token: ${{ secrets.DISCORD_TOKEN }}
+          STEAM_NEWS_CHANNEL_ID: ${{ secrets.STEAM_NEWS_CHANNEL_ID }}
+          STEAM_NEWS_APP_ID: ${{ secrets.STEAM_NEWS_APP_ID }}
+          STEAM_NEWS_LANGUAGE: ${{ secrets.STEAM_NEWS_LANGUAGE }}
+          STEAM_NEWS_FETCH_COUNT: ${{ secrets.STEAM_NEWS_FETCH_COUNT }}
+          # Add any other secrets your app needs, for example Supabase credentials:
+          # SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          # SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node steamNewsAction.js
