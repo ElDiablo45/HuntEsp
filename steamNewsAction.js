@@ -9,7 +9,6 @@ async function runSteamNewsAction() {
 
     const client = new Client({
         intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
-        makeCache: () => new Map(),
     });
 
     client.on('error', (error) => {
