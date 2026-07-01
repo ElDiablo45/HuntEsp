@@ -53,13 +53,90 @@ function steamClanImageToUrl(clanId, imagePath) {
     return `${STEAM_CLAN_IMAGE_BASE_URL}/${clanId}/${cleanImagePath}`;
 }
 
+function stripSteamTags(text = '') {
+    return decodeSteamEntities(text)
+        .replace(/\[b\]([\s\S]*?)\[\/b\]/gi, '**$1**')
+        .replace(/\[i\]([\s\S]*?)\[\/i\]/gi, '*$1*')
+        .replace(/\[u\]([\s\S]*?)\[\/u\]/gi, '$1')
+        .replace(/\[url=([^\]]+)\]([\s\S]*?)\[\/url\]/gi, '[$2]($1)')
+        .replace(/\[url\]([\s\S]*?)\[\/url\]/gi, '$1')
+        .replace(/\[\/?[^\]]+\]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function steamTableToText(tableContent = '') {
+    const rows = [...tableContent.matchAll(/\[tr\]([\s\S]*?)\[\/tr\]/gi)]
+        .map(row => {
+            return [...row[1].matchAll(/\[(?:td|th)\]([\s\S]*?)\[\/(?:td|th)\]/gi)]
+                .map(cell => stripSteamTags(cell[1]));
+        })
+        .filter(row => row.length);
+
+    if (!rows.length) return '';
+
+    const columnCount = Math.max(...rows.map(row => row.length));
+    const widths = Array(columnCount).fill(0);
+
+    for (const row of rows) {
+        for (let i = 0; i < columnCount; i++) {
+            widths[i] = Math.max(widths[i], String(row[i] || '').length);
+        }
+    }
+
+    const lines = rows.map(row => {
+        return Array.from({ length: columnCount }, (_, i) => {
+            return String(row[i] || '').padEnd(widths[i]);
+        }).join(' | ');
+    });
+
+    return `\n\n\`\`\`text\n${lines.join('\n')}\n\`\`\`\n\n`;
+}
+
+function normalizeSteamLists(text = '') {
+    let level = 0;
+
+    return text
+        .replace(/\[list\]/gi, () => {
+            level++;
+            return '\n';
+        })
+        .replace(/\[\/list\]/gi, () => {
+            level = Math.max(0, level - 1);
+            return '\n';
+        })
+        .replace(/\[\*\]\s*/gi, () => {
+            const indent = '  '.repeat(Math.max(0, level - 1));
+            const bullet = level <= 1 ? '•' : '◦';
+            return `\n${indent}${bullet} `;
+        });
+}
+
+
+
 function normalizeSteamContent(content = '') {
-    return decodeSteamEntities(content)
+    return normalizeSteamLists(decodeSteamEntities(content))
         .replace(/\r/g, '')
 
-        // Imagenes Steam
+        // Imagenes Steam dentro de [img]...[/img]
+        .replace(/\[img\]\s*\{STEAM_CLAN_IMAGE\}\/(\d+)\/([^\[\]\s]+)\s*\[\/img\]/gi, (_, clanId, imagePath) => {
+            return `\n\n{{IMAGE:${steamClanImageToUrl(clanId, imagePath)}}}\n\n`;
+        })
+
+        // Imagenes con URL normal dentro de [img]...[/img]
+        .replace(/\[img\]\s*([\s\S]*?)\s*\[\/img\]/gi, (_, imageUrl) => {
+            const cleanUrl = imageUrl.trim();
+            return cleanUrl ? `\n\n{{IMAGE:${cleanUrl}}}\n\n` : '';
+        })
+
+        // Imagenes Steam sueltas
         .replace(/\{STEAM_CLAN_IMAGE\}\/(\d+)\/([^\s\])}]+)/gi, (_, clanId, imagePath) => {
             return `\n\n{{IMAGE:${steamClanImageToUrl(clanId, imagePath)}}}\n\n`;
+        })
+
+        // Tablas Steam
+        .replace(/\[table\]([\s\S]*?)\[\/table\]/gi, (_, tableContent) => {
+            return steamTableToText(tableContent);
         })
 
         // Saltos HTML
@@ -83,17 +160,11 @@ function normalizeSteamContent(content = '') {
         .replace(/\[url=([^\]]+)\]([\s\S]*?)\[\/url\]/gi, '[$2]($1)')
         .replace(/\[url\]([\s\S]*?)\[\/url\]/gi, '$1')
 
-        // Listas Steam
-        .replace(/\[list\]/gi, '\n')
-        .replace(/\[\/list\]/gi, '\n')
-        .replace(/\[\*\]\s*/g, '\n• ')
-
-        // Imagenes / videos BBCode
-        .replace(/\[img\]([\s\S]*?)\[\/img\]/gi, '\n\n{{IMAGE:$1}}\n\n')
+        // Videos
         .replace(/\[previewyoutube[^\]]*\][\s\S]*?\[\/previewyoutube\]/gi, '')
 
         // Limpieza de BBCode restante
-        .replace(/\[\/?[^\\]]+\]/g, '')
+        .replace(/\[\/?[^\]]+\]/g, '')
 
         // Arreglar espacios y saltos
         .replace(/[ \t]+\n/g, '\n')
