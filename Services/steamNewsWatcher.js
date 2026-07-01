@@ -266,17 +266,36 @@ async function sendPlainNews(channel, newsItem, appId, language) {
         const payload = block.type === 'image'
             ? { files: [block.url], allowedMentions: { parse: [] } }
             : { content: block.content, allowedMentions: { parse: [] } };
+
         let sent;
+
         try {
             sent = await channel.send(payload);
+
+            // Autopublicar si el canal es de anuncios
+            if (sent.crosspostable) {
+                await sent.crosspost().catch((error) => {
+                    console.error('[Steam News] No se pudo autopublicar:', error.message);
+                });
+            }
         } catch (error) {
             if (block.type !== 'image') throw error;
+
             console.error('[Steam News] No se pudo adjuntar una imagen de Steam:', error.message);
+
             sent = await channel.send({
                 content: block.url,
                 allowedMentions: { parse: [] },
             });
+
+            // Autopublicar tambien el fallback de imagen
+            if (sent.crosspostable) {
+                await sent.crosspost().catch((crosspostError) => {
+                    console.error('[Steam News] No se pudo autopublicar fallback:', crosspostError.message);
+                });
+            }
         }
+
         sentMessages.push(sent);
     }
 
