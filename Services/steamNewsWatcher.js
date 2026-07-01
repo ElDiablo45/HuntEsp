@@ -168,7 +168,7 @@ function normalizeSteamContent(content = '') {
 
         // Arreglar espacios y saltos
         .replace(/[ \t]+\n/g, '\n')
-        .replace(/\n[ \t]+/g, '\n')
+        // NO borrar espacios despues de salto de linea, porque son la sangria de listas
         .replace(/\n{3,}/g, '\n\n')
         .trim();
 }
