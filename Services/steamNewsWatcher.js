@@ -107,15 +107,12 @@ function normalizeSteamLists(text = '') {
         })
         .replace(/\[\*\]\s*/gi, () => {
             const indent = '  '.repeat(Math.max(0, level - 1));
-            return `\n${indent}- `;
+            const bullet = level <= 1 ? '•' : '◦';
+            return `\n${indent}${bullet} `;
         });
 }
 
-function trimBlock(text = '') {
-    return text
-        .replace(/^\n+/, '')
-        .replace(/\n+$/, '');
-}
+
 
 function normalizeSteamContent(content = '') {
     return normalizeSteamLists(decodeSteamEntities(content))
@@ -177,14 +174,12 @@ function normalizeSteamContent(content = '') {
 }
 
 function splitMessage(text, maxLength = MESSAGE_CHUNK_LIMIT) {
-    text = trimBlock(text);
-
     if (!text || text.length <= maxLength) {
         return [text || 'Sin contenido disponible.'];
     }
 
     const chunks = [];
-    let remaining = text;
+    let remaining = text.trim();
 
     while (remaining.length > maxLength) {
         let splitAt = remaining.lastIndexOf('\n\n', maxLength);
@@ -201,11 +196,11 @@ function splitMessage(text, maxLength = MESSAGE_CHUNK_LIMIT) {
             splitAt = maxLength;
         }
 
-        chunks.push(trimBlock(remaining.slice(0, splitAt)));
-        remaining = trimBlock(remaining.slice(splitAt));
+        chunks.push(remaining.slice(0, splitAt).trim());
+        remaining = remaining.slice(splitAt).trim();
     }
 
-    if (remaining) chunks.push(trimBlock(remaining));
+    if (remaining) chunks.push(remaining);
     return chunks;
 }
 
@@ -217,20 +212,18 @@ function contentToBlocks(content) {
     let match;
 
     while ((match = imagePattern.exec(normalized)) !== null) {
-        const text = trimBlock(normalized.slice(cursor, match.index));
-
+        const text = normalized.slice(cursor, match.index).trim();
         if (text) {
             for (const chunk of splitMessage(text)) {
                 blocks.push({ type: 'text', content: chunk });
             }
         }
 
-        blocks.push({ type: 'image', url: match[1].trim() });
+        blocks.push({ type: 'image', url: match[1] });
         cursor = imagePattern.lastIndex;
     }
 
-    const tail = trimBlock(normalized.slice(cursor));
-
+    const tail = normalized.slice(cursor).trim();
     if (tail) {
         for (const chunk of splitMessage(tail)) {
             blocks.push({ type: 'text', content: chunk });
@@ -273,31 +266,18 @@ async function sendPlainNews(channel, newsItem, appId, language) {
         const payload = block.type === 'image'
             ? { files: [block.url], allowedMentions: { parse: [] } }
             : { content: block.content, allowedMentions: { parse: [] } };
-
         let sent;
-
         try {
             sent = await channel.send(payload);
         } catch (error) {
             if (block.type !== 'image') throw error;
-
             console.error('[Steam News] No se pudo adjuntar una imagen de Steam:', error.message);
-
             sent = await channel.send({
                 content: block.url,
                 allowedMentions: { parse: [] },
             });
         }
-
         sentMessages.push(sent);
-    }
-
-    for (const message of sentMessages) {
-        if (message.crosspostable) {
-            await message.crosspost().catch((error) => {
-                console.error('[Steam News] No se pudo autopublicar:', error.message);
-            });
-        }
     }
 
     return sentMessages;
