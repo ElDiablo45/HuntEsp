@@ -107,12 +107,15 @@ function normalizeSteamLists(text = '') {
         })
         .replace(/\[\*\]\s*/gi, () => {
             const indent = '  '.repeat(Math.max(0, level - 1));
-            const bullet = level <= 1 ? '•' : '◦';
-            return `\n${indent}${bullet} `;
+            return `\n${indent}- `;
         });
 }
 
-
+function trimBlock(text = '') {
+    return text
+        .replace(/^\n+/, '')
+        .replace(/\n+$/, '');
+}
 
 function normalizeSteamContent(content = '') {
     return normalizeSteamLists(decodeSteamEntities(content))
@@ -174,12 +177,14 @@ function normalizeSteamContent(content = '') {
 }
 
 function splitMessage(text, maxLength = MESSAGE_CHUNK_LIMIT) {
+    text = trimBlock(text);
+
     if (!text || text.length <= maxLength) {
         return [text || 'Sin contenido disponible.'];
     }
 
     const chunks = [];
-    let remaining = text.trim();
+    let remaining = text;
 
     while (remaining.length > maxLength) {
         let splitAt = remaining.lastIndexOf('\n\n', maxLength);
@@ -196,11 +201,11 @@ function splitMessage(text, maxLength = MESSAGE_CHUNK_LIMIT) {
             splitAt = maxLength;
         }
 
-        chunks.push(remaining.slice(0, splitAt).trim());
-        remaining = remaining.slice(splitAt).trim();
+        chunks.push(trimBlock(remaining.slice(0, splitAt)));
+        remaining = trimBlock(remaining.slice(splitAt));
     }
 
-    if (remaining) chunks.push(remaining);
+    if (remaining) chunks.push(trimBlock(remaining));
     return chunks;
 }
 
@@ -212,18 +217,20 @@ function contentToBlocks(content) {
     let match;
 
     while ((match = imagePattern.exec(normalized)) !== null) {
-        const text = normalized.slice(cursor, match.index).trim();
+        const text = trimBlock(normalized.slice(cursor, match.index));
+
         if (text) {
             for (const chunk of splitMessage(text)) {
                 blocks.push({ type: 'text', content: chunk });
             }
         }
 
-        blocks.push({ type: 'image', url: match[1] });
+        blocks.push({ type: 'image', url: match[1].trim() });
         cursor = imagePattern.lastIndex;
     }
 
-    const tail = normalized.slice(cursor).trim();
+    const tail = trimBlock(normalized.slice(cursor));
+
     if (tail) {
         for (const chunk of splitMessage(tail)) {
             blocks.push({ type: 'text', content: chunk });
@@ -271,13 +278,6 @@ async function sendPlainNews(channel, newsItem, appId, language) {
 
         try {
             sent = await channel.send(payload);
-
-            // Autopublicar si el canal es de anuncios
-            if (sent.crosspostable) {
-                await sent.crosspost().catch((error) => {
-                    console.error('[Steam News] No se pudo autopublicar:', error.message);
-                });
-            }
         } catch (error) {
             if (block.type !== 'image') throw error;
 
@@ -287,16 +287,17 @@ async function sendPlainNews(channel, newsItem, appId, language) {
                 content: block.url,
                 allowedMentions: { parse: [] },
             });
-
-            // Autopublicar tambien el fallback de imagen
-            if (sent.crosspostable) {
-                await sent.crosspost().catch((crosspostError) => {
-                    console.error('[Steam News] No se pudo autopublicar fallback:', crosspostError.message);
-                });
-            }
         }
 
         sentMessages.push(sent);
+    }
+
+    for (const message of sentMessages) {
+        if (message.crosspostable) {
+            await message.crosspost().catch((error) => {
+                console.error('[Steam News] No se pudo autopublicar:', error.message);
+            });
+        }
     }
 
     return sentMessages;
