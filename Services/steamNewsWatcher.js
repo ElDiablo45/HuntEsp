@@ -7,7 +7,7 @@ const DEFAULT_INTERVAL_MINUTES = 10;
 const DEFAULT_FETCH_COUNT = 10;
 const STEAM_NEWS_URL = 'https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/';
 const DISCORD_MESSAGE_LIMIT = 2000;
-const MESSAGE_CHUNK_LIMIT = 1850;
+const MESSAGE_CHUNK_LIMIT = 1900;
 const CHANNEL_HISTORY_LIMIT = 100;
 const STEAM_CLAN_IMAGE_BASE_URL = 'https://clan.cloudflare.steamstatic.com/images';
 
@@ -29,7 +29,7 @@ async function fetchSteamNews(appId, language) {
         params: {
             appid: appId,
             count: Number(process.env.STEAM_NEWS_FETCH_COUNT) || DEFAULT_FETCH_COUNT,
-            maxlength: 5000,
+            maxlength: 0,
             format: 'json',
             l: language,
         },
@@ -56,37 +56,74 @@ function steamClanImageToUrl(clanId, imagePath) {
 function normalizeSteamContent(content = '') {
     return decodeSteamEntities(content)
         .replace(/\r/g, '')
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<\/p>/gi, '\n\n')
-        .replace(/<[^>]+>/g, '')
+
+        // Imagenes Steam
         .replace(/\{STEAM_CLAN_IMAGE\}\/(\d+)\/([^\s\])}]+)/gi, (_, clanId, imagePath) => {
             return `\n\n{{IMAGE:${steamClanImageToUrl(clanId, imagePath)}}}\n\n`;
         })
-        .replace(/\[url=([^\]]+)\]([\s\S]*?)\[\/url\]/gi, '$2 ($1)')
-        .replace(/\[h[1-6]\]([\s\S]*?)\[\/h[1-6]\]/gi, '\n\n**$1**\n')
+
+        // Saltos HTML
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/p>/gi, '\n\n')
+        .replace(/<p[^>]*>/gi, '\n\n')
+        .replace(/<[^>]+>/g, '')
+
+        // Titulos Steam
+        .replace(/\[h1\]([\s\S]*?)\[\/h1\]/gi, '\n\n# $1\n\n')
+        .replace(/\[h2\]([\s\S]*?)\[\/h2\]/gi, '\n\n## $1\n\n')
+        .replace(/\[h3\]([\s\S]*?)\[\/h3\]/gi, '\n\n### $1\n\n')
+        .replace(/\[h[4-6]\]([\s\S]*?)\[\/h[4-6]\]/gi, '\n\n**$1**\n\n')
+
+        // Formato basico
         .replace(/\[b\]([\s\S]*?)\[\/b\]/gi, '**$1**')
         .replace(/\[i\]([\s\S]*?)\[\/i\]/gi, '*$1*')
         .replace(/\[u\]([\s\S]*?)\[\/u\]/gi, '$1')
-        .replace(/\[\*\]/g, '\n- ')
-        .replace(/\[\/?list\]/gi, '\n')
-        .replace(/\[\/?img\]/gi, '')
-        .replace(/\[\/?previewyoutube[^\]]*\]/gi, '')
+
+        // Links
+        .replace(/\[url=([^\]]+)\]([\s\S]*?)\[\/url\]/gi, '[$2]($1)')
+        .replace(/\[url\]([\s\S]*?)\[\/url\]/gi, '$1')
+
+        // Listas Steam
+        .replace(/\[list\]/gi, '\n')
+        .replace(/\[\/list\]/gi, '\n')
+        .replace(/\[\*\]\s*/g, '\n• ')
+
+        // Imagenes / videos BBCode
+        .replace(/\[img\]([\s\S]*?)\[\/img\]/gi, '\n\n{{IMAGE:$1}}\n\n')
+        .replace(/\[previewyoutube[^\]]*\][\s\S]*?\[\/previewyoutube\]/gi, '')
+
+        // Limpieza de BBCode restante
         .replace(/\[\/?[^\\]]+\]/g, '')
+
+        // Arreglar espacios y saltos
         .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n[ \t]+/g, '\n')
         .replace(/\n{3,}/g, '\n\n')
         .trim();
 }
 
 function splitMessage(text, maxLength = MESSAGE_CHUNK_LIMIT) {
-    if (!text || text.length <= maxLength) return [text || 'Sin contenido disponible.'];
+    if (!text || text.length <= maxLength) {
+        return [text || 'Sin contenido disponible.'];
+    }
 
     const chunks = [];
-    let remaining = text;
+    let remaining = text.trim();
 
     while (remaining.length > maxLength) {
-        let splitAt = remaining.lastIndexOf('\n', maxLength);
-        if (splitAt < maxLength * 0.5) splitAt = remaining.lastIndexOf(' ', maxLength);
-        if (splitAt < maxLength * 0.5) splitAt = maxLength;
+        let splitAt = remaining.lastIndexOf('\n\n', maxLength);
+
+        if (splitAt < maxLength * 0.5) {
+            splitAt = remaining.lastIndexOf('\n', maxLength);
+        }
+
+        if (splitAt < maxLength * 0.5) {
+            splitAt = remaining.lastIndexOf(' ', maxLength);
+        }
+
+        if (splitAt < maxLength * 0.5) {
+            splitAt = maxLength;
+        }
 
         chunks.push(remaining.slice(0, splitAt).trim());
         remaining = remaining.slice(splitAt).trim();
